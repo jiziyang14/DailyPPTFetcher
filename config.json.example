@@ -1,0 +1,7 @@
+{
+    "ftp_server": "your_server",
+    "ftp_username": "your_username",
+    "ftp_password": "your_password",
+    "primary_remote_path": "/Chinese",
+    "secondary_remote_path": "/English"
+}
