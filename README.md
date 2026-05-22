@@ -1,6 +1,6 @@
 # 📥 DailyPPTFetcher
 
-> 每天自动从 FTP 服务器下载当天早读 PPT 到桌面，删除超过 1 天的旧文件，并自动打开。
+> 每天自动从 FTP 服务器下载当天 PPT 到桌面并自动打开。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
