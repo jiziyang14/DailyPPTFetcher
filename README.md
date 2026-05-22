@@ -10,17 +10,17 @@
 
 ## ✨ 功能特性
 
-- 🧹 **\*\*自动清理\*\***：删除桌面上超过 1 天的旧 PPT（文件名带时间戳）
+- 🧹 **自动清理**：删除桌面上超过 1 天的旧 PPT（文件名带时间戳）
 
-- 🔍 **\*\*智能识别当天文件\*\***：优先从文件名提取 `M.d` 或 `MM.dd` 日期，备选 FTP 修改时间
+- 🔍 **智能识别当天文件**：优先从文件名提取 `M.d` 或 `MM.dd` 日期，备选 FTP 修改时间
 
-- ⬇️ **\*\*自动下载\*\***：从 FTP 服务器下载当天 PPT 到桌面，并添加日期戳（避免重名覆盖）
+- ⬇️ **自动下载**：从 FTP 服务器下载当天 PPT 到桌面，并添加日期戳（避免重名覆盖）
 
-- 🪟 **\*\*一键打开\*\***：下载成功后自动最小化其他窗口，并打开所有 PPT
+- 🪟 **一键打开**：下载成功后自动最小化其他窗口，并打开所有 PPT
 
-- 🔁 **\*\*多路径容错\*\***：支持主路径 + 备用路径（允许为空），提高下载成功率
+- 🔁 **多路径容错**：支持主路径 + 备用路径（允许为空），提高下载成功率
 
-- 🔒 **\*\*安全配置\*\***：敏感信息（FTP 密码）通过本地 `config.json` 管理，不提交到仓库
+- 🔒 **安全配置**：敏感信息（FTP 密码）通过本地 `config.json` 管理
 
 ## 🖥️ 系统要求
 
@@ -35,28 +35,22 @@
 ### 1. 获取代码
 
 ```bash
-
 git clone https://github.com/yourname/DailyPPTFetcher.git
 
 cd DailyPPTFetcher
+```
 
 或者直接下载 ZIP 并解压。
 
-**2. 配置 FTP 连接**
+### 2. 配置 FTP 连接
 
-复制配置模板并填写真实信息：
-
-bash
-
-copy config.json.example config.json
+复制配置模板并填写真实信息
 
 用文本编辑器（如记事本、VS Code）打开 config.json，按照提示填入：
-
-json
-
+```json
 {
 
-"ftp\_server": "192.168.105.20",
+"ftp\_server": "你的网络地址",
 
 "ftp\_username": "你的用户名",
 
@@ -67,6 +61,7 @@ json
 "secondary\_remote\_path": "/路径2/"
 
 }
+```
 
 ⚠️ **注意**
 
@@ -74,18 +69,18 @@ json
 * 路径格式与 FTP 服务器上的目录结构一致，以 / 开头并以 / 结尾
 * 保存文件编码推荐 **UTF-8**（无 BOM 也可）
 
-**3. 运行脚本**
+### 3. 运行脚本
 
 * **方式一**：双击 run.bat（推荐，已绕过 PowerShell 执行策略）
 * **方式二**：在 PowerShell 中手动执行（需管理员权限设置执行策略或加参数）：
 
-powershell
-
+```powershell
 powershell -ExecutionPolicy Bypass -File DailyPPTFetcher.ps1
+```
 
-**🗂️ 文件命名与识别规则**
+## 🗂️ 文件命名与识别规则
 
-**当天文件判断流程**
+### 当天文件判断流程
 
 1. 扫描 FTP 目录下所有 .ppt 或 .pptx 文件
 2. 对每个文件：
@@ -94,24 +89,24 @@ powershell -ExecutionPolicy Bypass -File DailyPPTFetcher.ps1
    * 若匹配失败，则获取 FTP 文件的 LastModified 时间与当天比较
 3. 满足任一条件即视为当天文件
 
-**下载到本地的命名**
+### 下载到本地的命名
 
 * 格式：原文件名\_YYYYMMDD.pptx
   例如：早读\_20260521.pptx
 
-**过期清理规则**
+### 过期清理规则
 
 * 桌面上所有文件名包含 \_YYYYMMDD 格式的 PPT 文件
-* 如果该日期早于 **当前日期 - 1 天**，则自动删除
+* 如果该日期早于 **当前日期  1 天**，则自动删除
 
-**❓ 常见问题**
+## ❓ 常见问题
 
-**1. 提示“未找到配置文件 config.json”**
+### 1. 提示“未找到配置文件 config.json”
 
 **原因**：没有创建配置文件。
 **解决**：将 config.json.example 复制为 config.json 并填写真实信息。
 
-**2. FTP 连接失败或列表为空**
+### 2. FTP 连接失败或列表为空
 
 **可能原因**：
 
@@ -121,45 +116,44 @@ powershell -ExecutionPolicy Bypass -File DailyPPTFetcher.ps1
 
 **解决**：用 FileZilla 等 FTP 客户端测试连接，确认参数正确。
 
-**3. 下载后的 PPT 没有自动打开**
+### 3. 下载后的 PPT 没有自动打开
 
 **原因**：系统未关联 .ppt / .pptx 到任何程序。
 **解决**：安装 Microsoft PowerPoint 或 WPS，或右键指定默认打开方式。
 
-**4. 执行脚本时提示“无法加载，因为在此系统上禁止运行脚本”**
+### 4. 执行脚本时提示“无法加载，因为在此系统上禁止运行脚本”
 
 **原因**：PowerShell 执行策略限制。
 **解决**：使用 run.bat 启动（已加 -ExecutionPolicy Bypass），或者管理员运行 PowerShell 并执行：
 
-powershell
-
+```powershell
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
-**5. 中文显示为乱码或脚本报错**
+### 5. 中文显示为乱码或脚本报错
 
 **原因**：脚本文件编码不是 UTF-8 with BOM（旧版 PowerShell 兼容问题）。
+
 **解决**：用记事本打开 DailyPPTFetcher.ps1，另存为，编码选择 **UTF-8 with BOM**。
 
-**🤝 贡献**
+## 🤝 贡献
 
 欢迎提交 Issue 或 Pull Request。如果你有改进建议，请先通过 Issue 讨论。
 
-**开发环境准备**
+### 开发环境准备
 
 * Windows + PowerShell 5.1+
 * Git
 * 任意文本编辑器（推荐 VS Code）
 
-**📄 许可证**
+### 📄 许可证
 
 本项目采用 [MIT 许可证](https://license/)。
 **保留原作者版权信息**：Copyright (c) 嵇子扬
 
-**📧 联系与支持**
+### 📧 联系与支持
 
 * 报告 Bug 或功能请求：请到 [GitHub Issues](https://github.com/yourname/DailyPPTFetcher/issues)
 * 如需私有定制或商业授权，请联系原作者
 
 **如果这个工具对你有帮助，请给一个 ⭐ Star 支持一下！**
-
-ss
