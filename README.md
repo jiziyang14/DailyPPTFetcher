@@ -35,7 +35,7 @@
 ### 1. 获取代码
 
 ```bash
-git clone https://github.com/yourname/DailyPPTFetcher.git
+git clone https://github.com/jiziyang14/DailyPPTFetcher.git
 
 cd DailyPPTFetcher
 ```
@@ -153,7 +153,7 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ### 📧 联系与支持
 
-* 报告 Bug 或功能请求：请到 [GitHub Issues](https://github.com/yourname/DailyPPTFetcher/issues)
+* 报告 Bug 或功能请求：请到 [GitHub Issues](https://github.com/jiziyang14/DailyPPTFetcher/issues)
 * 如需私有定制或商业授权，请联系原作者
 
 **如果这个工具对你有帮助，请给一个 ⭐ Star 支持一下！**
