@@ -84,7 +84,7 @@ powershell -ExecutionPolicy Bypass -File DailyPPTFetcher.ps1
 
 1. 扫描 FTP 目录下所有 .ppt 或 .pptx 文件
 2. 对每个文件：
-   * 尝试从文件名中匹配 M.d 或 MM.dd 格式的日期（例如 3.21.pptx 或 03.21.pptx）
+   * 尝试从文件名中匹配日期（例如 3.21.pptx 或 03.21.pptx）
    * 若匹配成功，用该日期与当天比较
    * 若匹配失败，则获取 FTP 文件的 LastModified 时间与当天比较
 3. 满足任一条件即视为当天文件
@@ -97,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File DailyPPTFetcher.ps1
 ### 过期清理规则
 
 * 桌面上所有文件名包含 \_YYYYMMDD 格式的 PPT 文件
-* 如果该日期早于 **当前日期  1 天**，则自动删除
+* 如果该日期早于 **当前日期 1 天**，则自动删除
 
 ## ❓ 常见问题
 
