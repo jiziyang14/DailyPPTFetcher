@@ -55,7 +55,6 @@ $ftpServer   = $config.ftp_server
 $ftpUser     = $config.ftp_username
 $ftpPass     = $config.ftp_password
 $remotePath1 = $config.primary_remote_path
-# 修复 else 语法错误：使用三元运算符风格的简写，但 PowerShell 中应写为 if..else 完整语句块
 if ($config.secondary_remote_path) {
     $remotePath2 = $config.secondary_remote_path
 } else {
@@ -115,6 +114,9 @@ function Get-TodayPptFromFtp {
 
     $todayFiles = @()
     foreach ($f in $pptFiles) {
+        # 净化文件名，防止路径注入
+        $safeFileName = [System.IO.Path]::GetFileName($f)
+
         $extractedDateStr = $null
         $extractedDate = $null
         $matches = [regex]::Matches($f, $dateRegex)
@@ -128,9 +130,9 @@ function Get-TodayPptFromFtp {
             } catch { }
         }
 
-        # 获取 FTP 真实修改时间（上传时间）
+        # 获取 FTP 真实修改时间（使用净化后的文件名）
         $ftpDate = $null
-        $furi = $baseUri + $f
+        $furi = $baseUri + $safeFileName
         $dreq = [System.Net.FtpWebRequest]::Create($furi)
         $dreq.Method = [System.Net.WebRequestMethods+Ftp]::GetDateTimestamp
         $dreq.Credentials = $cred
@@ -165,7 +167,7 @@ function Get-TodayPptFromFtp {
 
         if ($isToday) {
             $todayFiles += [PSCustomObject]@{ 
-                Name = $f
+                Name = $safeFileName
                 SortKey = if ($ftpDate) { $ftpDate } elseif ($extractedDate) { $extractedDate } else { [DateTime]::MinValue }
                 RemoteDir = $RemoteDir
             }
@@ -202,12 +204,14 @@ $timestamp = Get-Date -Format "yyyyMMdd"
 $downloadedFiles = @()
 
 foreach ($item in $todayPptList) {
-    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($item.Name)
-    $ext      = [System.IO.Path]::GetExtension($item.Name)
+    # 二次净化，防御性编程
+    $cleanName = [System.IO.Path]::GetFileName($item.Name)
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($cleanName)
+    $ext      = [System.IO.Path]::GetExtension($cleanName)
     $localName = "${baseName}_${timestamp}${ext}"
     $localFile = Join-Path $desktop $localName
 
-    $sourceUri = "ftp://$ftpServer$($item.RemoteDir)$($item.Name)"
+    $sourceUri = "ftp://$ftpServer$($item.RemoteDir)$cleanName"
     Write-Host "下载: " -NoNewline -ForegroundColor DarkBlue
     Write-Host "$($item.Name) -> $localName"
     try {
