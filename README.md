@@ -50,15 +50,15 @@ cd DailyPPTFetcher
 ```json
 {
 
-"ftp_server": "你的网络地址",
+    "ftp_server": "你的网络地址",
 
-"ftp_username": "你的用户名",
+    "ftp_username": "你的用户名",
 
-"ftp_password": "你的密码",
+    "ftp_password": "你的密码",
 
-"primary_remote_path": "/路径1/",
+    "primary_remote_path": "/路径1/",
 
-"secondary_remote_path": "/路径2/"
+    "secondary_remote_path": "/路径2/"
 
 }
 ```
