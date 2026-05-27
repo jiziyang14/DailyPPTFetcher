@@ -4,8 +4,8 @@
 .DESCRIPTION
     1. 删除桌面上所有带时间戳且日期超过1天的 PPT 文件
     2. 从配置的 FTP 路径获取当天日期 PPT；若未找到，则从备用路径查找
-    3. 下载所有当天日期的 PPT 到桌面，添加日期戳，并用默认程序打开
-    4. 打开 PPT 前自动最小化所有窗口（仅在有PPT打开时执行，且不包含本程序窗口）
+    3. 下载所有当天日期的 PPT 到桌面，添加日期戳
+    4. 打开 PPT 后最小化其他窗口，等待 5 秒发送 F5，再等 5 秒发送第二次 F5，确保进入全屏放映
 .COPYRIGHT
     Copyright (c) 嵇子扬
 .NOTES
@@ -15,7 +15,6 @@
 
 [Console]::OutputEncoding = [System.Text.Encoding]::Default
 
-# 显示版权信息
 Write-Host "========================================" -ForegroundColor DarkBlue
 Write-Host "  早读 PPT 自动下载工具" -ForegroundColor White
 Write-Host "  Copyright (c) 嵇子扬" -ForegroundColor White
@@ -41,7 +40,6 @@ try {
     exit 1
 }
 
-# 必要字段检查
 $required = @('ftp_server', 'ftp_username', 'ftp_password', 'primary_remote_path')
 foreach ($field in $required) {
     if (-not $config.$field) {
@@ -61,7 +59,6 @@ if ($config.secondary_remote_path) {
     $remotePath2 = $null
 }
 
-# 确保远程路径以斜杠结尾
 if (-not $remotePath1.EndsWith('/')) { $remotePath1 += '/' }
 if ($remotePath2 -and -not $remotePath2.EndsWith('/')) { $remotePath2 += '/' }
 
@@ -69,6 +66,23 @@ $desktop = [Environment]::GetFolderPath("Desktop")
 $cred    = New-Object System.Net.NetworkCredential($ftpUser, $ftpPass)
 $today   = (Get-Date).Date
 # =================================================
+
+# 提前导入所需程序集（窗口操作 + SendKeys）
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WinAPI {
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetConsoleWindow();
+}
+"@
 
 # --- 第一步：清理桌面上过期 PPT ---
 Write-Host "正在清理过期文件..." -ForegroundColor DarkBlue
@@ -95,7 +109,6 @@ function Get-TodayPptFromFtp {
     param([string]$RemoteDir)
     $baseUri = "ftp://$ftpServer$RemoteDir"
 
-    # 列出目录
     $req = [System.Net.FtpWebRequest]::Create($baseUri)
     $req.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectory
     $req.Credentials = $cred
@@ -109,12 +122,10 @@ function Get-TodayPptFromFtp {
     $pptFiles = @($allNames | Where-Object { $_ -match '\.ppt[x]?$' })
     if ($pptFiles.Count -eq 0) { return @() }
 
-    # 正则：支持个位数的月/日，前面的0可选
     $dateRegex = '(?<!\d)(0?[1-9]|1[0-2])\.(0?[1-9]|[12]\d|3[01])(?!\d)'
 
     $todayFiles = @()
     foreach ($f in $pptFiles) {
-        # 净化文件名，防止路径注入
         $safeFileName = [System.IO.Path]::GetFileName($f)
 
         $extractedDateStr = $null
@@ -130,7 +141,6 @@ function Get-TodayPptFromFtp {
             } catch { }
         }
 
-        # 获取 FTP 真实修改时间（使用净化后的文件名）
         $ftpDate = $null
         $furi = $baseUri + $safeFileName
         $dreq = [System.Net.FtpWebRequest]::Create($furi)
@@ -143,7 +153,6 @@ function Get-TodayPptFromFtp {
             $dres.Close()
         } catch { }
 
-        # 判断是否为当天文件
         $isToday = $false
         if ($extractedDate -and $extractedDate.Date -eq $today) {
             $isToday = $true
@@ -159,10 +168,10 @@ function Get-TodayPptFromFtp {
             '未知'
         }
 
-        if ($extractedDateStr) {
-            $displayLine = "$f -> 提取日期：$extractedDateStr；系统日期：$displayDateStr"
+        $displayLine = if ($extractedDateStr) {
+            "$f -> 提取日期：$extractedDateStr；系统日期：$displayDateStr"
         } else {
-            $displayLine = "$f -> $displayDateStr"
+            "$f -> $displayDateStr"
         }
 
         if ($isToday) {
@@ -204,7 +213,6 @@ $timestamp = Get-Date -Format "yyyyMMdd"
 $downloadedFiles = @()
 
 foreach ($item in $todayPptList) {
-    # 二次净化，防御性编程
     $cleanName = [System.IO.Path]::GetFileName($item.Name)
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($cleanName)
     $ext      = [System.IO.Path]::GetExtension($cleanName)
@@ -226,33 +234,38 @@ foreach ($item in $todayPptList) {
     }
 }
 
-# --- 第六步：打开下载的 PPT 并最小化其他窗口 ---
+# --- 第六步：全屏播放（F5，双重按键）---
 if ($downloadedFiles.Count -gt 0) {
-    Write-Host "`n正在最小化其他窗口..." -ForegroundColor DarkBlue
-    
-    Add-Type @"
-    using System;
-    using System.Runtime.InteropServices;
-    public class WindowHelper {
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetForegroundWindow();
-        [DllImport("user32.dll")]
-        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    }
-"@
-    $currentWindow = [WindowHelper]::GetForegroundWindow()
-    
-    $shell = New-Object -ComObject Shell.Application
-    [void]$shell.MinimizeAll()
-    Start-Sleep -Milliseconds 500
-    Write-Host "窗口已最小化。" -ForegroundColor White
+    Write-Host "`n正在准备全屏播放..." -ForegroundColor DarkBlue
 
-    [void][WindowHelper]::ShowWindow($currentWindow, 9)
-    
-    Write-Host "正在打开所有当天 PPT..." -ForegroundColor White
+    $shell = New-Object -ComObject Shell.Application
+    $shell.MinimizeAll()
+    Start-Sleep -Milliseconds 500
+    $currentWindow = [WinAPI]::GetForegroundWindow()
+    [WinAPI]::ShowWindow($currentWindow, 9) | Out-Null
+
     foreach ($file in $downloadedFiles) {
-        Start-Process $file
-        Start-Sleep -Milliseconds 500
+        Write-Host "正在播放: $(Split-Path $file -Leaf)" -ForegroundColor White
+
+        $proc = Start-Process -FilePath $file -PassThru
+        $hwnd = [IntPtr]::Zero
+        $retries = 0
+        while ($hwnd -eq [IntPtr]::Zero -and $retries -lt 30) {
+            Start-Sleep -Seconds 1
+            try { $hwnd = $proc.MainWindowHandle } catch { }
+            $retries++
+        }
+
+        if ($hwnd -ne [IntPtr]::Zero) {
+            [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+            Start-Sleep -Seconds 5
+            [System.Windows.Forms.SendKeys]::SendWait("{F5}")
+            Start-Sleep -Seconds 5
+            [System.Windows.Forms.SendKeys]::SendWait("{F5}")
+            $proc.WaitForExit()
+        } else {
+            Write-Host "  [警告] 无法获取 PowerPoint 窗口，请手动操作。" -ForegroundColor Yellow
+        }
     }
 } else {
     Write-Host "[警告] 所有文件下载失败。" -ForegroundColor DarkRed
