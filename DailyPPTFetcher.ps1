@@ -5,7 +5,7 @@
     1. 删除桌面上所有带时间戳且日期超过1天的 PPT 文件
     2. 从配置的 FTP 路径获取当天日期 PPT；若未找到，则从备用路径查找
     3. 下载所有当天日期的 PPT 到桌面，添加日期戳
-    4. 打开 PPT 后最小化其他窗口，等待 5 秒发送 F5，再等 5 秒发送第二次 F5，确保进入全屏放映
+    4. 最小化其他窗口，通过 COM 接口直接全屏放映，无焦点问题
 .COPYRIGHT
     Copyright (c) 嵇子扬
 .NOTES
@@ -66,23 +66,6 @@ $desktop = [Environment]::GetFolderPath("Desktop")
 $cred    = New-Object System.Net.NetworkCredential($ftpUser, $ftpPass)
 $today   = (Get-Date).Date
 # =================================================
-
-# 提前导入所需程序集（窗口操作 + SendKeys）
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public class WinAPI {
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")]
-    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("kernel32.dll")]
-    public static extern IntPtr GetConsoleWindow();
-}
-"@
 
 # --- 第一步：清理桌面上过期 PPT ---
 Write-Host "正在清理过期文件..." -ForegroundColor DarkBlue
@@ -234,39 +217,71 @@ foreach ($item in $todayPptList) {
     }
 }
 
-# --- 第六步：全屏播放（F5，双重按键）---
+# --- 第六步：全屏放映（COM 方式，无焦点问题）---
 if ($downloadedFiles.Count -gt 0) {
     Write-Host "`n正在准备全屏播放..." -ForegroundColor DarkBlue
 
+    # 最小化所有窗口，保持桌面整洁
     $shell = New-Object -ComObject Shell.Application
     $shell.MinimizeAll()
     Start-Sleep -Milliseconds 500
-    $currentWindow = [WinAPI]::GetForegroundWindow()
-    [WinAPI]::ShowWindow($currentWindow, 9) | Out-Null
+
+    # 尝试连接演示软件（PowerPoint 或 WPS）
+    $app = $null
+    try { $app = New-Object -ComObject PowerPoint.Application } catch { }
+    if ($null -eq $app) {
+        try { $app = New-Object -ComObject WPP.Application } catch { }
+    }
+
+    if ($null -eq $app) {
+        Write-Host "[错误] 无法创建 PowerPoint 或 WPS 的 COM 对象，请确保已安装演示软件。" -ForegroundColor Red
+        Start-Sleep -Seconds 5
+        exit 1
+    }
+
+    $app.Visible = $true
+    Write-Host "已连接到演示软件" -ForegroundColor Green
 
     foreach ($file in $downloadedFiles) {
         Write-Host "正在播放: $(Split-Path $file -Leaf)" -ForegroundColor White
+        try {
+            $pres = $app.Presentations.Open($file)
+            $null = $pres.SlideShowSettings.Run()   # 抑制 COM 返回值，避免英文输出
 
-        $proc = Start-Process -FilePath $file -PassThru
-        $hwnd = [IntPtr]::Zero
-        $retries = 0
-        while ($hwnd -eq [IntPtr]::Zero -and $retries -lt 30) {
-            Start-Sleep -Seconds 1
-            try { $hwnd = $proc.MainWindowHandle } catch { }
-            $retries++
-        }
+            # 等待放映窗口稳定
+            Start-Sleep -Seconds 2
 
-        if ($hwnd -ne [IntPtr]::Zero) {
-            [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
-            Start-Sleep -Seconds 5
-            [System.Windows.Forms.SendKeys]::SendWait("{F5}")
-            Start-Sleep -Seconds 5
-            [System.Windows.Forms.SendKeys]::SendWait("{F5}")
-            $proc.WaitForExit()
-        } else {
-            Write-Host "  [警告] 无法获取 PowerPoint 窗口，请手动操作。" -ForegroundColor Yellow
+            # 输出友好的放映状态（不输出原始 COM 对象）
+            if ($app.SlideShowWindows.Count -gt 0) {
+                $ssw = $app.SlideShowWindows.Item(1)
+                $isFull = if ($ssw.IsFullScreen) { "是" } else { "否" }
+                $isActive = if ($ssw.Active) { "是" } else { "否" }
+                Write-Host "  放映已开始：全屏 $isFull，窗口尺寸 $($ssw.Width)×$($ssw.Height)，活动状态 $isActive" -ForegroundColor Green
+            } else {
+                Write-Host "  放映正在启动..." -ForegroundColor Yellow
+            }
+
+            # 等待放映结束（用户按 ESC 或放映自然结束）
+            while ($app.SlideShowWindows.Count -gt 0) {
+                Start-Sleep -Seconds 1
+            }
+            $pres.Close()
+            Write-Host "  放映结束。" -ForegroundColor White
+        } catch {
+            Write-Host "  [错误] 播放失败: $_" -ForegroundColor Red
+        } finally {
+            if ($pres) {
+                [System.Runtime.Interopservices.Marshal]::ReleaseComObject($pres) | Out-Null
+            }
         }
     }
+
+    # 关闭演示软件并释放资源
+    $app.Quit()
+    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($app) | Out-Null
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    Write-Host "演示软件已退出。" -ForegroundColor Green
 } else {
     Write-Host "[警告] 所有文件下载失败。" -ForegroundColor DarkRed
 }
